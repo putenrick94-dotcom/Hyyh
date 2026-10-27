@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kosmisches Universum & Nebula Simulator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #030308;
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+            color: #e2e8f0;
+        }
+
+        .font-orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        /* Glassmorphism Design */
+        .glass-panel {
+            background: rgba(10, 15, 30, 0.65);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(0, 243, 255, 0.18);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5),
+                        inset 0 0 15px rgba(0, 243, 255, 0.05);
+        }
+
+        .glass-button {
+            background: rgba(20, 30, 55, 0.5);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(0, 243, 255, 0.25);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-button:hover {
+            background: rgba(0, 243, 255, 0.2);
+            border-color: rgba(0, 243, 255, 0.8);
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .glass-button.active {
+            background: linear-gradient(135deg, rgba(0, 243, 255, 0.4), rgba(255, 0, 128, 0.4));
+            border-color: #00f3ff;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.6);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(5, 10, 20, 0.5);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 243, 255, 0.4);
+            border-radius: 2px;
+        }
+
+        /* Custom Canvas Overlay Effects */
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* Glow effects */
+        .neon-text-cyan {
+            text-shadow: 0 0 10px rgba(0, 243, 255, 0.7), 0 0 20px rgba(0, 243, 255, 0.4);
+        }
+        .neon-text-pink {
+            text-shadow: 0 0 10px rgba(255, 0, 128, 0.7), 0 0 20px rgba(255, 0, 128, 0.4);
+        }
+
+        /* Range slider styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            height: 6px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #00f3ff;
+            cursor: pointer;
+            box-shadow: 0 0 10px #00f3ff;
+        }
+
+        /* Pulse Animations */
+        @keyframes pulse-slow {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.8; }
+        }
+        .animate-pulse-slow {
+            animation: pulse-slow 4s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="w-screen h-screen overflow-hidden select-none">
+
+    <!-- WebGL Canvas Container -->
+    <div id="canvas-container"></div>
+
+    <!-- HUD Overlay UI -->
+    <div id="ui-layer" class="relative z-10 w-full h-full pointer-events-none flex flex-col justify-between p-4 md:p-6">
+
+        <!-- Top Header Bar -->
+        <div class="flex justify-between items-start pointer-events-auto">
+            <!-- Title & Status -->
+            <div class="glass-panel p-4 rounded-2xl max-w-xs md:max-w-md">
+                <div class="flex items-center space-x-3 mb-1">
+                    <span class="inline-block w-3 h-3 rounded-full bg-cyan-400 animate-ping"></span>
+                    <h1 class="font-orbitron font-bold text-lg md:text-xl tracking-wider text-white neon-text-cyan">
+                        KOSMOS <span class="text-pink-500 neon-text-pink">NEXUS</span>
+                    </h1>
+                </div>
+                <p class="text-xs text-cyan-200/70 font-light">3D Partikel & Gravitations-Simulator</p>
+                
+                <div class="mt-3 flex items-center space-x-4 text-xs font-mono text-gray-400">
+                    <div>FPS: <span id="fps-counter" class="text-cyan-400 font-bold">60</span></div>
+                    <div>PARTIKEL: <span id="particle-count-display" class="text-pink-400 font-bold">150.000</span></div>
+                </div>
+            </div>
+
+            <!-- Top Right Action Controls -->
+            <div class="flex items-center space-x-3">
+                <button id="btn-audio-toggle" class="glass-button p-3 rounded-xl text-cyan-400 hover:text-white flex items-center space-x-2 text-sm font-semibold">
+                    <i class="fa-solid fa-microphone-slash id="audio-icon""></i>
+                    <span class="hidden md:inline">Audio React</span>
+                </button>
+                <button id="btn-soundtrack" class="glass-button p-3 rounded-xl text-pink-400 hover:text-white flex items-center space-x-2 text-sm font-semibold">
+                    <i class="fa-solid fa-music"></i>
+                    <span class="hidden md:inline">Ambient Sound</span>
+                </button>
+                <button id="btn-toggle-menu" class="glass-button p-3 rounded-xl text-cyan-400 hover:text-white">
+                    <i class="fa-solid fa-sliders text-lg"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Center Crosshair / Interactive Hint (Fades out) -->
+        <div id="interaction-hint" class="self-center text-center transition-opacity duration-1000 opacity-80 pointer-events-none my-auto">
+            <div class="w-16 h-16 border border-cyan-500/30 rounded-full flex items-center justify-center mx-auto mb-3 animate-pulse-slow">
+                <div class="w-2 h-2 bg-pink-500 rounded-full"></div>
+            </div>
+            <p class="font-orbitron text-xs tracking-widest text-cyan-300 uppercase">Ziehen zum Drehen | Klicken für Schockwelle</p>
+        </div>
+
+        <!-- Bottom Control Bar -->
+        <div class="flex flex-col md:flex-row justify-between items-end gap-4 pointer-events-auto">
+
+            <!-- Presets / Visual Modes -->
+            <div class="glass-panel p-3 rounded-2xl w-full md:w-auto flex flex-wrap gap-2 justify-center">
+                <button data-mode="supernova" class="preset-btn glass-button active px-4 py-2 rounded-xl text-xs font-orbitron font-semibold tracking-wider text-white">
+                    <i class="fa-solid fa-sun text-yellow-400 mr-2"></i>Supernova
+                </button>
+                <button data-mode="blackhole" class="preset-btn glass-button px-4 py-2 rounded-xl text-xs font-orbitron font-semibold tracking-wider text-white">
+                    <i class="fa-solid fa-circle text-purple-400 mr-2"></i>Schwarzes Loch
+                </button>
+                <button data-mode="matrix" class="preset-btn glass-button px-4 py-2 rounded-xl text-xs font-orbitron font-semibold tracking-wider text-white">
+                    <i class="fa-solid fa-cubes text-emerald-400 mr-2"></i>Quantum Matrix
+                </button>
+                <button data-mode="neural" class="preset-btn glass-button px-4 py-2 rounded-xl text-xs font-orbitron font-semibold tracking-wider text-white">
+                    <i class="fa-solid fa-brain text-pink-400 mr-2"></i>Neurales Netz
+                </button>
+            </div>
+
+            <!-- Morph Targets Selector -->
+            <div class="glass-panel p-3 rounded-2xl flex items-center space-x-2 overflow-x-auto max-w-full">
+                <span class="text-xs font-orbitron text-cyan-400 uppercase px-2 font-bold whitespace-nowrap">Form:</span>
+                <button data-shape="spiral" class="shape-btn glass-button active px-3 py-1.5 rounded-lg text-xs font-medium text-gray-200">Spirale</button>
+                <button data-shape="sphere" class="shape-btn glass-button px-3 py-1.5 rounded-lg text-xs font-medium text-gray-200">Kugel</button>
+                <button data-shape="torus" class="shape-btn glass-button px-3 py-1.5 rounded-lg text-xs font-medium text-gray-200">Torus Knot</button>
+                <button data-shape="dna" class="shape-btn glass-button px-3 py-1.5 rounded-lg text-xs font-medium text-gray-200">DNA Helix</button>
+                <button data-shape="cube" class="shape-btn glass-button px-3 py-1.5 rounded-lg text-xs font-medium text-gray-200">Kubus</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Customization Settings Panel (Right side Drawer) -->
+    <div id="settings-panel" class="fixed top-20 right-6 z-20 w-80 glass-panel p-5 rounded-2xl transform translate-x-96 transition-transform duration-500 ease-in-out pointer-events-auto">
+        <div class="flex justify-between items-center mb-4 border-b border-cyan-500/20 pb-2">
+            <h3 class="font-orbitron font-bold text-sm text-cyan-400 uppercase tracking-wider">Simulation Kontrollen</h3>
+            <button id="btn-close-settings" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <div class="space-y-4 text-xs">
+            <!-- Particle Count Slider -->
+            <div>
+                <div class="flex justify-between text-gray-300 mb-1">
+                    <span>Partikelanzahl</span>
+                    <span id="val-particles" class="text-cyan-400 font-mono">150.000</span>
+                </div>
+                <input id="slider-particles" type="range" min="20000" max="300000" step="10000" value="150000" class="w-full">
+            </div>
+
+            <!-- Rotation Speed -->
+            <div>
+                <div class="flex justify-between text-gray-300 mb-1">
+                    <span>Rotationsgeschwindigkeit</span>
+                    <span id="val-speed" class="text-cyan-400 font-mono">1.0</span>
+                </div>
+                <input id="slider-speed" type="range" min="0" max="3" step="0.1" value="1.0" class="w-full">
+            </div>
+
+            <!-- Gravitational Pull -->
+            <div>
+                <div class="flex justify-between text-gray-300 mb-1">
+                    <span>Schwerkraft-Intensität</span>
+                    <span id="val-gravity" class="text-cyan-400 font-mono">1.5</span>
+                </div>
+                <input id="slider-gravity" type="range" min="0" max="4" step="0.1" value="1.5" class="w-full">
+            </div>
+
+            <!-- Particle Size -->
+            <div>
+                <div class="flex justify-between text-gray-300 mb-1">
+                    <span>Partikelgröße</span>
+                    <span id="val-size" class="text-cyan-400 font-mono">2.0</span>
+                </div>
+                <input id="slider-size" type="range" min="0.5" max="6" step="0.1" value="2.0" class="w-full">
+            </div>
+
+            <!-- Bloom / Glow Intensity -->
+            <div>
+                <div class="flex justify-between text-gray-300 mb-1">
+                    <span>Glow / Leucht-Effekt</span>
+                    <span id="val-bloom" class="text-cyan-400 font-mono">2.5</span>
+                </div>
+                <input id="slider-bloom" type="range" min="0.5" max="5" step="0.1" value="2.5" class="w-full">
+            </div>
+
+            <!-- Color Schemes -->
+            <div class="pt-2 border-t border-cyan-500/20">
+                <span class="text-gray-300 block mb-2 font-semibold">Farb-Schema:</span>
+                <div class="grid grid-cols-4 gap-2">
+                    <button data-theme="nebula" class="theme-btn h-7 rounded-lg bg-gradient-to-r from-blue-600 via-purple-600 to-pink-500 border border-white/20"></button>
+                    <button data-theme="cyber" class="theme-btn h-7 rounded-lg bg-gradient-to-r from-cyan-400 via-teal-500 to-emerald-400 border border-white/20"></button>
+                    <button data-theme="inferno" class="theme-btn h-7 rounded-lg bg-gradient-to-r from-red-600 via-orange-500 to-yellow-400 border border-white/20"></button>
+                    <button data-theme="gold" class="theme-btn h-7 rounded-lg bg-gradient-to-r from-amber-200 via-yellow-500 to-amber-700 border border-white/20"></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN JAVASCRIPT LOGIC -->
+    <script>
+        // --- GLOBAL CONFIGURATION & STATE ---
+        const CONFIG = {
+            particleCount: 150000,
+            speed: 1.0,
+            gravity: 1.5,
+            particleSize: 2.0,
+            bloomIntensity: 2.5,
+            currentMode: 'supernova',
+            currentShape: 'spiral',
+            colorTheme: 'nebula',
+            audioReactive: false,
+            ambientSound: false
+        };
+
+        // Palette definitions
+        const PALETTES = {
+            nebula: [new THREE.Color('#00f3ff'), new THREE.Color('#7b2cbf'), new THREE.Color('#ff007f'), new THREE.Color('#3a0ca3')],
+            cyber: [new THREE.Color('#00f3ff'), new THREE.Color('#00ff87'), new THREE.Color('#38ef7d'), new THREE.Color('#11998e')],
+            inferno: [new THREE.Color('#ff0055'), new THREE.Color('#ff5000'), new THREE.Color('#ffcc00'), new THREE.Color('#990000')],
+            gold: [new THREE.Color('#ffffff'), new THREE.Color('#ffe100'), new THREE.Color('#ffae00'), new THREE.Color('#7a5200')]
+        };
+
+        // Performance tracking
+        let frameCount = 0;
+        let lastFpsUpdate = performance.now();
+        let fps = 60;
+
+        // ThreeJS variables
+        let scene, camera, renderer;
+        let particleGeometry, particleMaterial, particleSystem;
+        let positions, targetPositions, colors, originalColors, sizes;
+        let velocities;
+
+        // Interactive Forces & Physics
+        let mouse = new THREE.Vector2(-999, -999);
+        let raycaster = new THREE.Raycaster();
+        let targetRotationX = 0, targetRotationY = 0;
+        let currentRotationX = 0, currentRotationY = 0;
+        let shockwaveCenter = null;
+        let shockwaveRadius = 0;
+        let shockwaveActive = false;
+
+        // Audio System
+        let audioCtx, analyser, dataArray, micStream;
+        let synthOsc, synthGain;
+
+        // --- INITIALIZATION ---
+        window.onload = function() {
+            initThree();
+            createParticleSystem(CONFIG.particleCount);
+            setupEventListeners();
+            setupUIControls();
+            animate();
+
+            // Fade out initial hint
+            setTimeout(() => {
+                const hint = document.getElementById('interaction-hint');
+                if (hint) hint.style.opacity = '0';
+            }, 6000);
+        };
+
+        // Initialize Three.js Scene, Camera, Renderer
+        function initThree() {
+            const container = document.getElementById('canvas-container');
+
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x030308, 0.0015);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 3000);
+            camera.position.z = 800;
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setClearColor(scene.fog.color);
+            container.appendChild(renderer.domElement);
+        }
+
+        // --- PARTICLE SYSTEM GENERATOR ---
+        function createParticleSystem(count) {
+            if (particleSystem) scene.remove(particleSystem);
+
+            particleGeometry = new THREE.BufferGeometry();
+            positions = new Float32Array(count * 3);
+            targetPositions = new Float32Array(count * 3);
+            colors = new Float32Array(count * 3);
+            originalColors = new Float32Array(count * 3);
+            sizes = new Float32Array(count);
+            velocities = new Float32Array(count * 3);
+
+            // Generate initial shape targets (Spiral Galaxy)
+            generateShapePositions(CONFIG.currentShape, targetPositions, count);
+
+            const palette = PALETTES[CONFIG.colorTheme];
+
+            for (let i = 0; i < count; i++) {
+                // Initial random dispersion
+                positions[i * 3] = (Math.random() - 0.5) * 2000;
+                positions[i * 3 + 1] = (Math.random() - 0.5) * 2000;
+                positions[i * 3 + 2] = (Math.random() - 0.5) * 2000;
+
+                // Color interpolation from palette
+                const col = palette[Math.floor(Math.random() * palette.length)].clone();
+                col.offsetHSL((Math.random() - 0.5) * 0.1, 0, (Math.random() - 0.5) * 0.2);
+
+                colors[i * 3] = col.r;
+                colors[i * 3 + 1] = col.g;
+                colors[i * 3 + 2] = col.b;
+
+                originalColors[i * 3] = col.r;
+                originalColors[i * 3 + 1] = col.g;
+                originalColors[i * 3 + 2] = col.b;
+
+                sizes[i] = Math.random() * CONFIG.particleSize + 0.5;
+
+                velocities[i * 3] = 0;
+                velocities[i * 3 + 1] = 0;
+                velocities[i * 3 + 2] = 0;
+            }
+
+            particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            particleGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            particleGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+            // Custom Glowing Particle Shader Material
+            particleMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                    uTime: { value: 0 },
+                    uBloom: { value: CONFIG.bloomIntensity }
+                },
+                vertexShader: `
+                    attribute float size;
+                    attribute vec3 color;
+                    varying vec3 vColor;
+                    uniform float uTime;
+                    
+                    void main() {
+                        vColor = color;
+                        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                        gl_PointSize = size * (300.0 / -mvPosition.z);
+                        gl_Position = projectionMatrix * mvPosition;
+                    }
+                `,
+                fragmentShader: `
+                    varying vec3 vColor;
+                    uniform float uBloom;
+                    
+                    void main() {
+                        // Soft glowing particle circle
+                        float d = length(gl_PointCoord - vec2(0.5));
+                        if (d > 0.5) discard;
+                        
+                        float intensity = pow(1.0 - (d * 2.0), 2.0) * uBloom;
+                        gl_FragColor = vec4(vColor * intensity, intensity);
+                    }
+                `,
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+
+            particleSystem = new THREE.Points(particleGeometry, particleMaterial);
+            scene.add(particleSystem);
+        }
+
+        // --- GEOMETRIC MORPH TARGET CALCULATOR ---
+        function generateShapePositions(shape, targetArray, count) {
+            for (let i = 0; i < count; i++) {
+                let x = 0, y = 0, z = 0;
+                const i3 = i * 3;
+
+                switch (shape) {
+                    case 'spiral': {
+                        const arms = 4;
+                        const radius = Math.pow(Math.random(), 2) * 600 + 20;
+                        const spinAngle = radius * 0.008;
+                        const branchAngle = ((i % arms) * (2 * Math.PI)) / arms;
+                        const randomOffset = (Math.random() - 0.5) * (60 + radius * 0.1);
+
+                        x = Math.cos(branchAngle + spinAngle) * radius + randomOffset;
+                        y = (Math.random() - 0.5) * (40 + radius * 0.05);
+                        z = Math.sin(branchAngle + spinAngle) * radius + randomOffset;
+                        break;
+                    }
+
+                    case 'sphere': {
+                        const u = Math.random();
+                        const v = Math.random();
+                        const theta = u * 2.0 * Math.PI;
+                        const phi = Math.acos(2.0 * v - 1.0);
+                        const r = Math.cbrt(Math.random()) * 450;
+
+                        x = r * Math.sin(phi) * Math.cos(theta);
+                        y = r * Math.sin(phi) * Math.sin(theta);
+                        z = r * Math.cos(phi);
+                        break;
+                    }
+
+                    case 'torus': {
+                        const u = Math.random() * Math.PI * 2;
+                        const v = Math.random() * Math.PI * 2;
+                        const R = 350; // Major radius
+                        const r = 120 + (Math.random() - 0.5) * 40; // Minor radius
+
+                        x = (R + r * Math.cos(v)) * Math.cos(u);
+                        y = (R + r * Math.cos(v)) * Math.sin(u);
+                        z = r * Math.sin(v);
+                        break;
+                    }
+
+                    case 'dna': {
+                        const strand = i % 2 === 0 ? 1 : -1;
+                        const t = (i / count) * Math.PI * 30;
+                        const radius = 120;
+
+                        x = Math.cos(t) * radius * strand + (Math.random() - 0.5) * 30;
+                        y = (i / count) * 1200 - 600;
+                        z = Math.sin(t) * radius * strand + (Math.random() - 0.5) * 30;
+                        break;
+                    }
+
+                    case 'cube': {
+                        const size = 500;
+                        x = (Math.random() - 0.5) * size;
+                        y = (Math.random() - 0.5) * size;
+                        z = (Math.random() - 0.5) * size;
+                        break;
+                    }
+                }
+
+                targetArray[i3] = x;
+                targetArray[i3 + 1] = y;
+                targetArray[i3 + 2] = z;
+            }
+        }
+
+        // --- ANIMATION & PHYSICS ENGINE LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const time = performance.now() * 0.001;
+            particleMaterial.uniforms.uTime.value = time;
+
+            // Calculate FPS
+            frameCount++;
+            if (performance.now() - lastFpsUpdate >= 1000) {
+                fps = frameCount;
+                document.getElementById('fps-counter').innerText = fps;
+                frameCount = 0;
+                lastFpsUpdate = performance.now();
+
+                // Dynamic Auto Performance Scaling
+                if (fps < 30 && CONFIG.particleCount > 50000) {
+                    CONFIG.particleCount = Math.max(30000, CONFIG.particleCount - 20000);
+                    document.getElementById('particle-count-display').innerText = CONFIG.particleCount.toLocaleString();
+                    document.getElementById('slider-particles').value = CONFIG.particleCount;
+                    createParticleSystem(CONFIG.particleCount);
+                }
+            }
+
+            // Audio Analysis Data
+            let audioFrequency = 0;
+            if (CONFIG.audioReactive && analyser) {
+                analyser.getByteFrequencyData(dataArray);
+                let sum = 0;
+                for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+                audioFrequency = (sum / dataArray.length) / 255; // Normalized 0..1
+            }
+
+            // Smooth Camera Inertia / Mouse rotation
+            currentRotationX += (targetRotationX - currentRotationX) * 0.05;
+            currentRotationY += (targetRotationY - currentRotationY) * 0.05;
+
+            particleSystem.rotation.y = time * 0.05 * CONFIG.speed + currentRotationX;
+            particleSystem.rotation.x = currentRotationY;
+
+            const posAttr = particleGeometry.attributes.position;
+            const pos = posAttr.array;
+            const colAttr = particleGeometry.attributes.color;
+            const col = colAttr.array;
+
+            // Expand shockwave radius if triggered
+            if (shockwaveActive) {
+                shockwaveRadius += 25 * CONFIG.speed;
+                if (shockwaveRadius > 1200) shockwaveActive = false;
+            }
+
+            // --- PARTICLE PHYSICS UPDATE ---
+            const count = CONFIG.particleCount;
+            const morphLerpSpeed = 0.03;
+            const gravStrength = CONFIG.gravity * 0.8;
+
+            for (let i = 0; i < count; i++) {
+                const i3 = i * 3;
+
+                // 1. Morph towards target shape position
+                pos[i3] += (targetPositions[i3] - pos[i3]) * morphLerpSpeed;
+                pos[i3 + 1] += (targetPositions[i3 + 1] - pos[i3 + 1]) * morphLerpSpeed;
+                pos[i3 + 2] += (targetPositions[i3 + 2] - pos[i3 + 2]) * morphLerpSpeed;
+
+                // 2. Preset Specific Dynamic Behaviors
+                if (CONFIG.currentMode === 'supernova') {
+                    // Pulsing central burst
+                    const pulse = Math.sin(time * 2 + i) * (5 + audioFrequency * 30);
+                    pos[i3] += Math.sin(i) * pulse * 0.1;
+                    pos[i3 + 1] += Math.cos(i) * pulse * 0.1;
+                } 
+                else if (CONFIG.currentMode === 'blackhole') {
+                    // Gravitational swirl towards origin void
+                    const dx = -pos[i3];
+                    const dy = -pos[i3 + 1];
+                    const dz = -pos[i3 + 2];
+                    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz) + 0.1;
+
+                    if (dist > 80) {
+                        pos[i3] += (dx / dist) * gravStrength * 2;
+                        pos[i3 + 1] += (dy / dist) * gravStrength * 2;
+                        pos[i3 + 2] += (dz / dist) * gravStrength * 2;
+                    }
+                } 
+                else if (CONFIG.currentMode === 'matrix') {
+                    // Digital rain motion along Y axis
+                    pos[i3 + 1] -= (2 + Math.random() * 3) * CONFIG.speed;
+                    if (pos[i3 + 1] < -400) pos[i3 + 1] = 400;
+                }
+                else if (CONFIG.currentMode === 'neural') {
+                    // Synaptic firing pulse color highlights
+                    if (Math.random() < 0.001) {
+                        col[i3] = 1.0; col[i3 + 1] = 1.0; col[i3 + 2] = 1.0;
+                    } else {
+                        col[i3] += (originalColors[i3] - col[i3]) * 0.02;
+                        col[i3 + 1] += (originalColors[i3 + 1] - col[i3 + 1]) * 0.02;
+                        col[i3 + 2] += (originalColors[i3 + 2] - col[i3 + 2]) * 0.02;
+                    }
+                }
+
+                // 3. Audio Reactivity expansion
+                if (CONFIG.audioReactive && audioFrequency > 0.1) {
+                    pos[i3] += (Math.random() - 0.5) * audioFrequency * 15;
+                    pos[i3 + 1] += (Math.random() - 0.5) * audioFrequency * 15;
+                    pos[i3 + 2] += (Math.random() - 0.5) * audioFrequency * 15;
+                }
+
+                // 4. Interactive Click Shockwave
+                if (shockwaveActive && shockwaveCenter) {
+                    const dx = pos[i3] - shockwaveCenter.x;
+                    const dy = pos[i3 + 1] - shockwaveCenter.y;
+                    const dz = pos[i3 + 2] - shockwaveCenter.z;
+                    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+                    if (Math.abs(dist - shockwaveRadius) < 80) {
+                        const force = (1 - Math.abs(dist - shockwaveRadius) / 80) * 40;
+                        pos[i3] += (dx / (dist || 1)) * force;
+                        pos[i3 + 1] += (dy / (dist || 1)) * force;
+                        pos[i3 + 2] += (dz / (dist || 1)) * force;
+                    }
+                }
+            }
+
+            posAttr.needsUpdate = true;
+            colAttr.needsUpdate = true;
+
+            renderer.render(scene, camera);
+        }
+
+        // --- INTERACTION & EVENT LISTENERS ---
+        function setupEventListeners() {
+            let isDragging = false;
+            let previousMousePosition = { x: 0, y: 0 };
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+
+            // Pointer down / drag for 3D Camera movement
+            window.addEventListener('pointerdown', (e) => {
+                if (e.target.closest('#ui-layer, #settings-panel')) return;
+                isDragging = true;
+                previousMousePosition = { x: e.clientX, y: e.clientY };
+
+                // Trigger Shockwave on Click
+                triggerShockwave(e.clientX, e.clientY);
+                playInteractionSound();
+            });
+
+            window.addEventListener('pointermove', (e) => {
+                mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+                if (!isDragging) return;
+
+                const deltaX = e.clientX - previousMousePosition.x;
+                const deltaY = e.clientY - previousMousePosition.y;
+
+                targetRotationX += deltaX * 0.005;
+                targetRotationY += deltaY * 0.005;
+
+                previousMousePosition = { x: e.clientX, y: e.clientY };
+            });
+
+            window.addEventListener('pointerup', () => isDragging = false);
+
+            // Zoom in/out via Mouse Wheel
+            window.addEventListener('wheel', (e) => {
+                camera.position.z = Math.min(Math.max(camera.position.z + e.deltaY * 0.5, 200), 1800);
+            });
+        }
+
+        // Trigger interactive shockwave at 3D world space coordinates
+        function triggerShockwave(screenX, screenY) {
+            raycaster.setFromCamera(
+                new THREE.Vector2((screenX / window.innerWidth) * 2 - 1, -(screenY / window.innerHeight) * 2 + 1),
+                camera
+            );
+            const targetVec = new THREE.Vector3();
+            raycaster.ray.at(600, targetVec);
+
+            shockwaveCenter = targetVec;
+            shockwaveRadius = 0;
+            shockwaveActive = true;
+        }
+
+        // --- UI & CONTROL PANEL BINDINGS ---
+        function setupUIControls() {
+            // Preset Modes
+            document.querySelectorAll('.preset-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+                    const target = e.currentTarget;
+                    target.classList.add('active');
+
+                    CONFIG.currentMode = target.dataset.mode;
+
+                    // Automatically pair shape with preset mode for ultimate WOW effect
+                    if (CONFIG.currentMode === 'supernova') setShape('spiral');
+                    if (CONFIG.currentMode === 'blackhole') setShape('sphere');
+                    if (CONFIG.currentMode === 'matrix') setShape('cube');
+                    if (CONFIG.currentMode === 'neural') setShape('dna');
+                });
+            });
+
+            // Morph Shapes
+            document.querySelectorAll('.shape-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    setShape(e.currentTarget.dataset.shape);
+                });
+            });
+
+            function setShape(shape) {
+                CONFIG.currentShape = shape;
+                document.querySelectorAll('.shape-btn').forEach(b => {
+                    b.classList.toggle('active', b.dataset.shape === shape);
+                });
+                generateShapePositions(shape, targetPositions, CONFIG.particleCount);
+            }
+
+            // Drawer Settings Menu Toggle
+            const settingsPanel = document.getElementById('settings-panel');
+            document.getElementById('btn-toggle-menu').addEventListener('click', () => {
+                settingsPanel.classList.toggle('translate-x-96');
+            });
+            document.getElementById('btn-close-settings').addEventListener('click', () => {
+                settingsPanel.classList.add('translate-x-96');
+            });
+
+            // Range Sliders
+            bindSlider('slider-particles', 'val-particles', (v) => {
+                CONFIG.particleCount = parseInt(v);
+                document.getElementById('particle-count-display').innerText = CONFIG.particleCount.toLocaleString();
+                createParticleSystem(CONFIG.particleCount);
+            }, (v) => parseInt(v).toLocaleString());
+
+            bindSlider('slider-speed', 'val-speed', (v) => CONFIG.speed = parseFloat(v));
+            bindSlider('slider-gravity', 'val-gravity', (v) => CONFIG.gravity = parseFloat(v));
+            bindSlider('slider-size', 'val-size', (v) => {
+                CONFIG.particleSize = parseFloat(v);
+                if (particleMaterial) createParticleSystem(CONFIG.particleCount);
+            });
+            bindSlider('slider-bloom', 'val-bloom', (v) => {
+                CONFIG.bloomIntensity = parseFloat(v);
+                if (particleMaterial) particleMaterial.uniforms.uBloom.value = CONFIG.bloomIntensity;
+            });
+
+            // Theme Selector
+            document.querySelectorAll('.theme-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    CONFIG.colorTheme = e.currentTarget.dataset.theme;
+                    createParticleSystem(CONFIG.particleCount);
+                });
+            });
+
+            // Audio Reactivity
+            document.getElementById('btn-audio-toggle').addEventListener('click', toggleAudioInput);
+
+            // Ambient Sound Synthesizer
+            document.getElementById('btn-soundtrack').addEventListener('click', toggleAmbientSound);
+        }
+
+        function bindSlider(id, valId, callback, formatFn = (v) => v) {
+            const slider = document.getElementById(id);
+            const display = document.getElementById(valId);
+            slider.addEventListener('input', (e) => {
+                const val = e.target.value;
+                display.innerText = formatFn(val);
+                callback(val);
+            });
+        }
+
+        // --- WEB AUDIO API (SOUND & SYNTHESIZER) ---
+        function initAudioContext() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // Microphone input for audio-reactive mode
+        async function toggleAudioInput() {
+            initAudioContext();
+            const btn = document.getElementById('btn-audio-toggle');
+
+            if (!CONFIG.audioReactive) {
+                try {
+                    micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                    const source = audioCtx.createMediaStreamSource(micStream);
+                    analyser = audioCtx.createAnalyser();
+                    analyser.fftSize = 64;
+                    dataArray = new Uint8Array(analyser.frequencyBinCount);
+                    source.connect(analyser);
+
+                    CONFIG.audioReactive = true;
+                    btn.classList.add('active');
+                } catch (err) {
+                    alert('Mikrofon-Zugriff verweigert oder nicht unterstützt.');
+                }
+            } else {
+                CONFIG.audioReactive = false;
+                btn.classList.remove('active');
+                if (micStream) micStream.getTracks().forEach(t => t.stop());
+            }
+        }
+
+        // Generative Ambient Sci-Fi Drone Sound
+        function toggleAmbientSound() {
+            initAudioContext();
+            const btn = document.getElementById('btn-soundtrack');
+
+            if (!CONFIG.ambientSound) {
+                synthOsc = audioCtx.createOscillator();
+                synthGain = audioCtx.createGain();
+
+                synthOsc.type = 'sine';
+                synthOsc.frequency.setValueAtTime(55, audioCtx.currentTime); // Low A drone
+
+                // LFO for ambient pulse
+                const lfo = audioCtx.createOscillator();
+                lfo.frequency.value = 0.2;
+                const lfoGain = audioCtx.createGain();
+                lfoGain.gain.value = 15;
+                lfo.connect(synthOsc.frequency);
+                lfo.start();
+
+                synthGain.gain.setValueAtTime(0.01, audioCtx.currentTime);
+                synthGain.gain.exponentialRampToValueAtTime(0.15, audioCtx.currentTime + 3);
+
+                synthOsc.connect(synthGain);
+                synthGain.connect(audioCtx.destination);
+                synthOsc.start();
+
+                CONFIG.ambientSound = true;
+                btn.classList.add('active');
+            } else {
+                if (synthGain) {
+                    synthGain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1);
+                    setTimeout(() => synthOsc.stop(), 1000);
+                }
+                CONFIG.ambientSound = false;
+                btn.classList.remove('active');
+            }
+        }
+
+        // Futuristic Interaction Sound Effect
+        function playInteractionSound() {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(150 + Math.random() * 300, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.4);
+
+                gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.4);
+            } catch(e) {}
+        }
+    </script>
+</body>
+</html>
